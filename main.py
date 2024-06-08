@@ -3,9 +3,7 @@ import asyncio
 import pandas as pd
 from bs4 import BeautifulSoup
 from readability import Document
-
-
-
+import json
 
 async def fetch(session, url):
     try:
@@ -44,12 +42,13 @@ async def main():
     urls = df['URL'].tolist()
     contents = await fetch_all(urls)
 
-    # Add contents as a new column in the DataFrame
-    df['content'] = contents
+    # Prepare data for JSONL
+    data = [{"URL": url, "content": content} for url, content in zip(urls, contents)]
 
-    # Save the DataFrame back to CSV
-    df.to_csv('data/urls_with_content.csv', index=False)
+    # Write data to JSONL file
+    with open('data/urls_with_content.jsonl', 'w') as jsonl_file:
+        for entry in data:
+            jsonl_file.write(json.dumps(entry) + '\n')
 
 if __name__ == "__main__":
-
     asyncio.run(main())

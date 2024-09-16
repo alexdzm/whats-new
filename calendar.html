@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Event List</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        h1 {
+            color: #2c3e50;
+        }
+        #eventList {
+            list-style-type: none;
+            padding: 0;
+        }
+        .event {
+            background-color: #f0f0f0;
+            margin-bottom: 10px;
+            padding: 10px;
+            border-radius: 5px;
+        }
+        .event-title {
+            font-weight: bold;
+        }
+        .event-date {
+            color: #7f8c8d;
+        }
+        .event-url {
+            color: #3498db;
+        }
+    </style>
+</head>
+<body>
+    <h1>Event List</h1>
+    <ul id="eventList"></ul>
+
+    <script>
+        async function fetchEvents(urls) {
+            try {
+                const response = await fetch('http://127.0.0.1:8000/events/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ urls: urls }),
+                });
+                if (!response.ok) {
+                    throw new Error('Network response was not ok');
+                }
+                return await response.json();
+            } catch (error) {
+                console.error('Error fetching events:', error);
+                return [];
+            }
+        }
+
+        function displayEvents(events) {
+            const eventList = document.getElementById('eventList');
+            eventList.innerHTML = '';
+            events.forEach(event => {
+                const li = document.createElement('li');
+                li.className = 'event';
+                li.innerHTML = `
+                    <div class="event-title">${event.title}</div>
+                    <div class="event-date">${event.date}</div>
+                    <div class="event-url">${event.url}</div>
+                `;
+                eventList.appendChild(li);
+            });
+        }
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            const storedUrls = JSON.parse(localStorage.getItem('urls')) || [];
+            const events = await fetchEvents(storedUrls);
+            displayEvents(events);
+        });
+    </script>
+</body>
+</html>

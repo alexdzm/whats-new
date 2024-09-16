@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>URL Input Page</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 40px 20px;
+            background-color: #f0f4f8;
+            color: #333;
+            line-height: 1.6;
+        }
+        h1 {
+            text-align: center;
+            color: #2c3e50;
+            margin-bottom: 30px;
+        }
+        #urlInput {
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 10px;
+            border: 1px solid #bdc3c7;
+            border-radius: 4px;
+            font-size: 16px;
+        }
+        button {
+            background-color: #3498db;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background-color 0.3s;
+        }
+        button:hover {
+            background-color: #2980b9;
+        }
+        #urlList {
+            list-style-type: none;
+            padding: 0;
+            margin-top: 20px;
+        }
+        #urlList li {
+            background-color: white;
+            margin-bottom: 10px;
+            padding: 10px;
+            border-radius: 4px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        #urlList li button {
+            background-color: #e74c3c;
+            padding: 5px 10px;
+            font-size: 14px;
+        }
+        #urlList li button:hover {
+            background-color: #c0392b;
+        }
+        #goButton {
+            display: block;
+            width: 100%;
+            margin-top: 20px;
+            background-color: #2ecc71;
+        }
+        #goButton:hover {
+            background-color: #27ae60;
+        }
+    </style>
+</head>
+<body>
+    <h1>Enter URLs</h1>
+    <input type="text" id="urlInput" placeholder="Enter a URL">
+    <button onclick="addUrl()">Add URL</button>
+    <ul id="urlList"></ul>
+    <button id="goButton" onclick="sendUrls()">Go</button>
+
+    <script>
+        let urls = [];
+
+        function addUrl() {
+            const input = document.getElementById('urlInput');
+            const url = input.value.trim();
+            if (url) {
+                urls.push(url);
+                updateUrlList();
+                input.value = '';
+            }
+        }
+
+        function updateUrlList() {
+            const list = document.getElementById('urlList');
+            list.innerHTML = '';
+            urls.forEach((url, index) => {
+                const li = document.createElement('li');
+                li.textContent = url;
+                const removeButton = document.createElement('button');
+                removeButton.textContent = 'Remove';
+                removeButton.onclick = () => removeUrl(index);
+                li.appendChild(removeButton);
+                list.appendChild(li);
+            });
+        }
+
+        function removeUrl(index) {
+            urls.splice(index, 1);
+            updateUrlList();
+        }
+
+        function sendUrls() {
+            if (urls.length > 0) {
+                // In a real application, you would send the URLs to an API here
+                console.log('Sending URLs:', urls);
+                // For this example, we'll just store the URLs in localStorage
+                localStorage.setItem('urls', JSON.stringify(urls));
+                // Redirect to the calendar page
+                window.location.href = 'calendar.html';
+            } else {
+                alert('Please add at least one URL before proceeding.');
+            }
+        }
+    </script>
+</body>
+</html>

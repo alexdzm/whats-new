@@ -1,54 +1,108 @@
-import aiohttp
-import asyncio
-import pandas as pd
-from bs4 import BeautifulSoup
-from readability import Document
-import json
+import logging
+import os
+from fastapi import FastAPI, HTTPException, Request
+from pydantic import BaseModel, HttpUrl, validator
+from typing import List
+from fastapi.middleware.cors import CORSMiddleware
+from crawl4ai import WebCrawler
+from crawl4ai.extraction_strategy import LLMExtractionStrategy
+from dotenv import load_dotenv
 
-async def fetch(session, url):
-    try:
-        async with session.get(url) as response:
-            response.raise_for_status()  # Raise an exception for HTTP errors
-            html = await response.text()
-            return extract_main_content(html)
-    except aiohttp.ClientError as e:
-        return f"ClientError: {e}"
-    except aiohttp.http_exceptions.HttpProcessingError as e:
-        return f"HttpProcessingError: {e}"
-    except aiohttp.client_exceptions.ClientConnectorError as e:
-        return f"ClientConnectionError {e}"
-    except Exception as e:
-        return f"Exception: {e}"
+load_dotenv()
 
-def extract_main_content(html):
-    try:
-        doc = Document(html)
-        soup = BeautifulSoup(doc.summary(), 'html.parser')
-        return soup.get_text(separator='\n', strip=True)
-    except Exception as e:
-        return f"Error extracting content: {e}"
+from models import Event
 
-async def fetch_all(urls):
-    async with aiohttp.ClientSession() as session:
-        tasks = [fetch(session, url) for url in urls]
-        results = await asyncio.gather(*tasks, return_exceptions=True)
-        return results
+# Configure logging
+logging.basicConfig(level=logging.INFO,
+                    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
 
-async def main():
-    # Read URLs from CSV
-    df = pd.read_csv('data/urls_raw.csv')
+app = FastAPI()
 
-    # Fetch content for each URL
-    urls = df['URL'].tolist()
-    contents = await fetch_all(urls)
+# Enable CORS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Allows all origins
+    allow_credentials=True,
+    allow_methods=["*"],  # Allows all methods
+    allow_headers=["*"],  # Allows all headers
+)
 
-    # Prepare data for JSONL
-    data = [{"URL": url, "content": content} for url, content in zip(urls, contents)]
+class URLInput(BaseModel):
+    urls: List[str]
 
-    # Write data to JSONL file
-    with open('data/urls_with_content.jsonl', 'w') as jsonl_file:
-        for entry in data:
-            jsonl_file.write(json.dumps(entry) + '\n')
+    @validator('urls', each_item=True, pre=True)
+    def validate_url(cls, v):
+        if isinstance(v, str):
+            # If the URL doesn't start with a scheme, prepend 'https://'
+            if not v.startswith(('http://', 'https://')):
+                v = 'https://' + v
+            # If the URL starts with 'www.', prepend 'https://'
+            elif v.startswith('www.'):
+                v = 'https://' + v
+        return v
 
-if __name__ == "__main__":
-    asyncio.run(main())
+crawler = None
+
+@app.on_event("startup")
+async def startup_event():
+    global crawler
+    logger.info("Initializing WebCrawler...")
+    crawler = WebCrawler()
+    crawler.warmup()
+    logger.info("WebCrawler initialized and warmed up.")
+
+@app.post("/events/", response_model=List[Event])
+async def get_events(url_input: URLInput, request: Request):
+    logger.info(f"Received request to fetch events for URLs: {url_input.urls}")
+    events = []
+    for url in url_input.urls:
+        logger.info(f"Processing URL: {url}")
+        try:
+            result = crawler.run(
+                url=url,
+                word_count_threshold=1,
+                extraction_strategy= LLMExtractionStrategy(
+                    provider= "openai/gpt-4",
+                    api_token = os.environ("OPENAI_API_KEY"),
+                    schema=Event.schema(),
+                    extraction_type="schema",
+                    instruction="""You are an experienced music events analyst. You will be given the content of a website, you must return a list of events from it"""
+                ),            
+                bypass_cache=True,
+            )
+            logger.info(f"Successfully extracted events from {url}. Event count: {len(result)}")
+            events.extend(result)
+        except Exception as e:
+            logger.error(f"Error processing URL {url}: {str(e)}", exc_info=True)
+            raise HTTPException(status_code=500, detail=f"Error processing URL {url}: {str(e)}")
+    
+    logger.info(f"Returning {len(events)} events in total.")
+    return events
+
+@app.get("/")
+async def root():
+    logger.info("Root endpoint accessed")
+    return {"message": "Welcome to the Events API"}
+
+# Debug endpoints
+@app.get("/debug/log")
+async def debug_log():
+    logger.debug("This is a debug message")
+    logger.info("This is an info message")
+    logger.warning("This is a warning message")
+    logger.error("This is an error message")
+    return {"message": "Debug logs generated"}
+
+@app.get("/debug/crawler")
+async def debug_crawler():
+    if crawler:
+        return {"status": "initialized", "type": str(type(crawler))}
+    return {"status": "not initialized"}
+
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    logger.info(f"Request: {request.method} {request.url}")
+    response = await call_next(request)
+    logger.info(f"Response status: {response.status_code}")
+    return response

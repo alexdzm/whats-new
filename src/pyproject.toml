@@ -6,7 +6,7 @@ authors = ["Alex M <alex.martin@cabinetoffice.gov.uk>"]
 readme = "README.md"
 
 [tool.poetry.dependencies]
-python = "^3.12"
+python = "^3.11"
 fastapi = "0.111.0"
 pydantic = "2.7.4"
 python-dotenv = "1.0.1"

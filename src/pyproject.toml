@@ -1,22 +1,18 @@
 [tool.poetry]
-name = "whats-new"
+name = "src"
 version = "0.1.0"
-description = "See what's new in local music venues"
-authors = ["alexdzm"]
-license = "MIT"
+description = ""
+authors = ["Alex M <alex.martin@cabinetoffice.gov.uk>"]
 readme = "README.md"
 
 [tool.poetry.dependencies]
-python = "^3.11"
-readability-lxml = "^0.8.1"
-pip = "^24.0"
-install = "^1.3.5"
-lxml = {extras = ["html-clean"], version = "^5.2.2"}
+python = "^3.12"
+fastapi = "0.111.0"
+pydantic = "2.7.4"
+python-dotenv = "1.0.1"
 crawl4ai = {git = "https://github.com/unclecode/crawl4ai.git"}
+numpy = "^2.1.1"
 
-[tool.poetry.group.dev.dependencies]
-jupyter = "^1.0.0"
-pandas = "^2.2.2"
 
 [build-system]
 requires = ["poetry-core"]

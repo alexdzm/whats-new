@@ -7,6 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from crawl4ai import WebCrawler
 from crawl4ai.extraction_strategy import LLMExtractionStrategy
 from dotenv import load_dotenv
+import json
 
 load_dotenv()
 
@@ -14,7 +15,7 @@ from models import Event
 
 # Configure logging
 logging.basicConfig(level=logging.INFO,
-                    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+                    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',filename='logs.log')
 logger = logging.getLogger(__name__)
 
 app = FastAPI()
@@ -63,16 +64,36 @@ async def get_events(url_input: URLInput, request: Request):
                 url=url,
                 word_count_threshold=1,
                 extraction_strategy= LLMExtractionStrategy(
-                    provider= "openai/gpt-4",
-                    api_token = os.environ("OPENAI_API_KEY"),
+                    provider= "openai/gpt-4o-mini",
+                    api_token = os.environ["OPENAI_API_KEY"],
                     schema=Event.schema(),
                     extraction_type="schema",
                     instruction="""You are an experienced music events analyst. You will be given the content of a website, you must return a list of events from it"""
-                ),            
-                bypass_cache=True,
+                ),    
+                 bypass_cache=True,        
             )
-            logger.info(f"Successfully extracted events from {url}. Event count: {len(result)}")
-            events.extend(result)
+
+            #convert to event object
+            try:
+                data = json.loads(result.extracted_content)
+            except json.JSONDecodeError as e:
+                logger.log(f"Error decoding JSON: {e}")
+                data = []
+
+            # Convert to Pydantic models
+            extracted_events = []
+            for item in data:
+                try:
+                    # Handle empty date strings
+                    if item['date'] == "":
+                        item['date'] = None
+                    event = Event(**item)
+                    extracted_events.append(event)
+                except ValueError as e:
+                    logger.log(f"Error parsing item into Pydantic model: {e}")
+
+            logger.info(f"Successfully extracted events from {url}. Event count:")
+            events.extend(extracted_events)
         except Exception as e:
             logger.error(f"Error processing URL {url}: {str(e)}", exc_info=True)
             raise HTTPException(status_code=500, detail=f"Error processing URL {url}: {str(e)}")
